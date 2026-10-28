@@ -44,11 +44,23 @@ The GitHub, GitLab, Gitea and Bitbucket Server webhook servers (the `github_app`
 |------------------------|-----------|-------------------------------------------------------------------------------------------|
 | `GUNICORN_WORKERS`     | *(unset)* | Pins the worker count exactly. Overrides the derived count and `GUNICORN_MAX_WORKERS`.    |
 | `GUNICORN_MAX_WORKERS` | `4`       | Upper bound on the automatically derived worker count.                                    |
+| `GUNICORN_PRELOAD_TOKENIZER` | *(unset)* | Set to `1` to share the configured model's tokenizer between forked workers. |
 | `PORT`                 | `3000`    | Port the server binds to.                                                                 |
 
 When `GUNICORN_WORKERS` is unset, the worker count is derived from the CPUs actually available to the container (cgroup CPU limit, falling back to CPU affinity), clamped to between 2 and `GUNICORN_MAX_WORKERS`. Note that a CPU *request* without a *limit* leaves no cgroup quota to read, so the cap is what bounds the worker count there.
 
 **Sizing memory:** importing the application costs roughly 250MB. The app is imported once in the gunicorn master and workers are forked from it, so they share most of that baseline copy-on-write rather than each paying it in full — total memory grows with worker count, but by noticeably less than 250MB per worker. Start from about 1Gi for the default of 4 workers and adjust against your own metrics.
+
+For a server that regularly handles reviews, `GUNICORN_PRELOAD_TOKENIZER=1` also
+loads the configured model's tokenizer in the master before workers fork. This
+shares its read-only tables across workers without changing the model, token
+counts, context limits or worker count. It increases startup memory compared
+with a server that never processes a review, so leave it unset for unused
+deployments. Tokenizer initialization may need its normal public data download
+at startup; if that fails, startup continues and workers retain their existing
+on-demand initialization. Fallback models still initialize their own encoders
+when needed. Measure memory after every worker has processed representative
+reviews rather than comparing only freshly started containers.
 
 If the container is OOMKilled during startup, lower the worker count:
 
