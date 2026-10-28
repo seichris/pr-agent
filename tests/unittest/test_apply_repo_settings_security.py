@@ -70,6 +70,7 @@ SNAPSHOT_SECTIONS = (
     "OPENROUTER",
     "LITELLM",
     "GITHUB",
+    "GITHUB_APP",
     "BITBUCKET",
     "GITLAB",
     "GITEA",
@@ -150,6 +151,18 @@ def test_disabled_repo_settings_skips_provider_fetch(monkeypatch, settings_snaps
     assert captured["errors"] is None
     # Settings were not touched.
     assert get_settings().as_dict().get("PR_REVIEWER", {}).get("num_max_findings") == original_num
+
+
+def test_repo_settings_cannot_disable_github_actor_allowlist(monkeypatch, settings_snapshot):
+    provider = FakeGitProvider(repo_settings_bytes=b"[github_app]\nallowed_actor_ids = []\n")
+    _install_provider(monkeypatch, provider)
+    settings = get_settings()
+    settings.set("config.use_repo_settings_file", True)
+    settings.set("github_app.allowed_actor_ids", [123])
+
+    apply_repo_settings("https://example.com/owner/repo/pull/1")
+
+    assert list(settings.github_app.allowed_actor_ids) == [123]
 
 
 def _section(settings, name):

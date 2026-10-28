@@ -361,6 +361,7 @@ _This section only documents commented-out examples; see the [TOML source](https
 
 | Key | Default | Description |
 | --- | --- | --- |
+| `allowed_actor_ids` | [] | Host-only GitHub sender ID allowlist for webhook commands and automatic PR events; empty permits all actors. Missing/unlisted actors and malformed nonempty policies are denied. Uses the default identity provider; ping/connectivity events are unaffected. |
 | `override_deployment_type` | true | these toggles allows running the github app from custom deployments |
 **settings for "pull_request" event**
 

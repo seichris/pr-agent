@@ -82,6 +82,27 @@ Before running the health check, ensure you have:
 - Configured your [LLM provider](./changing_a_model.md)
 - Added a valid GitHub token to your configuration file
 
+## Restrict GitHub webhook actors
+
+For a public repository, the host can restrict who starts paid model requests:
+
+```toml
+[github_app]
+allowed_actor_ids = [12345678]
+```
+
+Use immutable numeric GitHub account IDs, not usernames. In an environment variable,
+set `GITHUB_APP__ALLOWED_ACTOR_IDS='[12345678]'`. With the default identity provider,
+this applies to manual comment commands, review-event commands and automatic PR
+events. A maintainer in the list can request a review of an external contributor's
+PR; an unlisted contributor cannot trigger it themselves. Missing actors and
+malformed configured policies are denied. An empty list preserves unrestricted
+behavior. Ping/connectivity webhooks are unaffected.
+
+This setting is host-only: repository configuration and comment arguments cannot
+disable or widen the list. It controls GitHub webhook dispatch, not local CLI use
+or other git providers, and does not replace webhook signature verification.
+
 ## Online usage
 
 Online usage means invoking PR-Agent tools by [comments](https://github.com/the-pr-agent/pr-agent/pull/229#issuecomment-1695021901) on a PR.
