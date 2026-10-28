@@ -347,6 +347,7 @@ publish_as_check_run = false # when true, publish review/description/improve out
 # fail_on_tool_errors = true  # a recorded tool failure (propagate_tool_errors=false) fails the Action; set false to keep the old green behavior
 
 [github_app]
+allowed_actor_ids = [] # Host-only GitHub sender ID allowlist for webhook commands and automatic PR events; empty permits all actors. Missing/unlisted actors and malformed nonempty policies are denied. Uses the default identity provider; ping/connectivity events are unaffected.
 # these toggles allows running the github app from custom deployments
 override_deployment_type = true
 # settings for "pull_request" event

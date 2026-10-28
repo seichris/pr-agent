@@ -48,6 +48,8 @@ REPO_HOST_ONLY_KEYS_BY_SECTION = {
     # agent_login decides which comments PR-Agent treats as its own and may edit, so the
     # reviewed repository must not choose it.
     "github": frozenset({"agent_login", "deployment_type", "polling_repositories"}),
+    # GitHub webhook actor authorization belongs to the host, never the reviewed repository.
+    "github_app": frozenset({"allowed_actor_ids"}),
     "gitlab": frozenset({"auth_type", "ssl_verify"}),
     "huggingface": frozenset({"api_base"}),
     # Jira lookups use the host's Atlassian credentials, so the reviewed repository must not
