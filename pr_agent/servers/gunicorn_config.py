@@ -275,6 +275,18 @@ proc_name = None
 
 def when_ready(server):
     """Runs after `preload_app` has imported the app and before any worker is forked."""
+    # Tokenizer tables are large and read-only. Loading the configured encoder here
+    # lets every worker share them instead of retaining its own after a review.
+    # Keep this opt-in: it raises the cold baseline of a server that receives no work.
+    if os.getenv('GUNICORN_PRELOAD_TOKENIZER') == '1':
+        try:
+            from pr_agent.algo.token_handler import TokenEncoder
+
+            TokenEncoder.get_token_encoder()
+        except Exception:
+            # A missing download/cache must not turn a memory optimization into a
+            # startup dependency. Leave the existing on-demand initialization intact.
+            server.log.warning("Tokenizer preloading failed; workers will initialize it on demand.")
     # Copy-on-write only saves memory while the shared pages stay clean, and CPython
     # dirties them on its own: the cyclic collector writes to the GC header of every
     # object it visits. Freezing moves everything allocated so far into a permanent

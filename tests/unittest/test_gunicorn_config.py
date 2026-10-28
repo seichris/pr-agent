@@ -13,6 +13,7 @@ def isolated_env(monkeypatch, tmp_path):
     """Detach every test from the host's env vars, CPU affinity, and real cgroup files."""
     monkeypatch.delenv("GUNICORN_WORKERS", raising=False)
     monkeypatch.delenv("GUNICORN_MAX_WORKERS", raising=False)
+    monkeypatch.delenv("GUNICORN_PRELOAD_TOKENIZER", raising=False)
     monkeypatch.delenv("PORT", raising=False)
     monkeypatch.setattr(gunicorn_config.os, "sched_getaffinity", lambda pid: set(range(64)), raising=False)
     for attr in ("CGROUP_V2_CPU_MAX", "CGROUP_V1_CPU_QUOTA", "CGROUP_V1_CPU_PERIOD"):
@@ -187,6 +188,52 @@ def test_when_ready_freezes_gc(monkeypatch):
     monkeypatch.setattr(gunicorn_config.gc, "freeze", lambda: calls.append(True))
     gunicorn_config.when_ready(server=None)
     assert calls == [True]
+
+
+def test_tokenizer_preload_precedes_freeze_and_preserves_worker_count(monkeypatch):
+    from pr_agent.algo.token_handler import TokenEncoder
+
+    calls = []
+    monkeypatch.setenv("GUNICORN_PRELOAD_TOKENIZER", "1")
+    monkeypatch.setattr(TokenEncoder, "get_token_encoder", lambda: calls.append("tokenizer"))
+    monkeypatch.setattr(gunicorn_config.gc, "freeze", lambda: calls.append("freeze"))
+    workers_before = gunicorn_config.compute_workers()
+
+    gunicorn_config.when_ready(server=None)
+
+    assert calls == ["tokenizer", "freeze"]
+    assert gunicorn_config.compute_workers() == workers_before
+
+
+def test_tokenizer_preload_failure_keeps_startup_and_lazy_loading_available(monkeypatch):
+    from pr_agent.algo.token_handler import TokenEncoder
+
+    monkeypatch.setenv("GUNICORN_PRELOAD_TOKENIZER", "1")
+    calls = []
+
+    def unavailable_encoder():
+        raise OSError("tokenizer cache unavailable")
+
+    monkeypatch.setattr(TokenEncoder, "get_token_encoder", unavailable_encoder)
+    monkeypatch.setattr(gunicorn_config.gc, "freeze", lambda: calls.append("freeze"))
+    server = SimpleNamespace(log=Mock())
+
+    gunicorn_config.when_ready(server)
+
+    assert calls == ["freeze"]
+    server.log.warning.assert_called_once()
+
+
+def test_tokenizer_preload_is_opt_in(monkeypatch):
+    from pr_agent.algo.token_handler import TokenEncoder
+
+    encoder = Mock(side_effect=AssertionError("cold servers must not load the tokenizer"))
+    monkeypatch.setattr(TokenEncoder, "get_token_encoder", encoder)
+    monkeypatch.setattr(gunicorn_config.gc, "freeze", lambda: None)
+
+    gunicorn_config.when_ready(server=None)
+
+    encoder.assert_not_called()
 
 
 @pytest.mark.parametrize("fail", [False, True])
